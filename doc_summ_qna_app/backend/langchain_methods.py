@@ -1,8 +1,16 @@
 
 from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader, TextLoader
 from langchain_core.documents import Document
-from typing import List, Tuple, Dict, Union, Optional
+from typing import List, Tuple, Dict, Union, Optional, Any
 from langchain.text_splitter import RecursiveCharacterTextSplitter  # To split text into chunks
+from langchain.schema import Document
+from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+import requests
+# from transformers import AutoTokenizer
+import faiss
+from langchain_community.docstore.in_memory import InMemoryDocstore
+from langchain_community.vectorstores import FAISS
+from uuid import uuid4
 
 def load_docs_file(file_path)->List[Document]:
     """
@@ -104,3 +112,149 @@ def document_chunking(document: List[Document], chunk_size: int = 800, chunk_ove
 
     return chunks
 
+def initialize_embeddings(model_name: str = "BAAI/bge-large-en-v1.5", 
+                          model_kwargs: Dict[str, str] = {"device": "cpu"}, 
+                          encode_kwargs: Dict[str, bool] = {"normalize_embeddings": True})->HuggingFaceBgeEmbeddings:
+    """
+    ## Description
+    Initializes a HuggingFaceBgeEmbeddings object with specified model and encoding parameters.
+
+    ## Arguments
+    - model_name : str, optional (default="BAAI/bge-large-en-v1.5")  
+        - Name of the HuggingFace model to use for generating embeddings.
+
+    - model_kwargs : Dict[str, str], optional (default={"device": "cpu"})  
+        - Dictionary of model configuration settings such as device type.
+
+    - encode_kwargs : Dict[str, bool], optional (default={"normalize_embeddings": True})  
+        - Dictionary of encoding options such as normalization of embeddings.
+
+    ## Returns
+    - HuggingFaceBgeEmbeddings  
+        An instance of HuggingFaceBgeEmbeddings initialized with given parameters.
+    """
+    print("response generated")
+    hf = HuggingFaceBgeEmbeddings(
+        model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
+        )
+    print("response generated")
+    return hf
+
+def embed_query(embedding_model:HuggingFaceBgeEmbeddings, query:str)->List[float]:
+    """
+    ## Description
+    Generates an embedding vector for a given query string using the specified embedding model.
+
+    ## Arguments
+    - embedding_model : HuggingFaceBgeEmbeddings  
+        - A pre-initialized HuggingFaceBgeEmbeddings object.
+
+    - query : str  
+        - The query string to be embedded.
+
+    ## Returns
+    - List[float]  
+        A list representing the embedding vector of the query.
+    """
+
+    query_embedding = embedding_model.embed_query(query)
+
+    return query_embedding
+
+def embed_document(embedding_model:HuggingFaceBgeEmbeddings, texts: List[str])->List[List[float]]:
+    """
+    ## Description
+    Generates embedding vectors for a list of document texts using the specified embedding model.
+
+    ## Arguments
+    - embedding_model : HuggingFaceBgeEmbeddings  
+        - A pre-initialized HuggingFaceBgeEmbeddings object.
+
+    - texts : List[str]  
+        - A list of document texts to be embedded.
+
+    ## Returns
+    - List[List[float]]  
+        A list of embedding vectors corresponding to the input texts.
+    """
+
+    document_embedding = embedding_model.embed_query(texts)
+
+    return document_embedding
+
+
+def initialize_vector_store(embedding_model:HuggingFaceBgeEmbeddings)->FAISS:
+    """
+    ## Description
+    Initializes a FAISS vector store with the given embedding model for similarity search.
+
+    ## Arguments
+    - embedding_model : HuggingFaceBgeEmbeddings  
+        - A pre-initialized HuggingFaceBgeEmbeddings object used for embedding documents.
+
+    ## Returns
+    - FAISS  
+        An instance of FAISS vector store ready for adding and searching documents.
+    """
+
+    index = faiss.IndexFlatL2(len(embed_query(embedding_model = embedding_model, query = "Hello World")))
+
+    vector_store = FAISS(
+        embedding_function=embedding_model,
+        index=index,
+        docstore=InMemoryDocstore(),
+        index_to_docstore_id={},
+    )
+
+    return vector_store
+
+def add_document_to_vector_store(documents: List[Document], vector_store:FAISS)->None:
+    """
+    ## Description
+    Adds a list of Document objects to the FAISS vector store with randomly generated UUIDs.
+
+    ## Arguments
+    - documents : List[Document]  
+        - A list of Document objects to be added to the vector store.
+
+    - vector_store : FAISS  
+        - An instance of the FAISS vector store where the documents will be added.
+
+    ## Returns
+    - None  
+        This function performs an in-place operation and does not return any value.
+    """
+    uuids = [str(uuid4()) for _ in range(len(documents))]
+
+    vector_store.add_documents(documents=documents, ids=uuids)
+
+def retrive_similar_chunks(vector_store:FAISS, query:str, k_most_similar = 3, filter_query: Dict[str,Any] | None = None)->List:
+    """
+    ## Description
+    Retrieves the most similar document chunks from the vector store for a given query.
+
+    ## Arguments
+    - vector_store : FAISS  
+        - An instance of the FAISS vector store used for similarity search.
+
+    - query : str  
+        - The query string to search for similar documents.
+
+    - k_most_similar : int, optional (default=3)  
+        - Number of most similar document chunks to retrieve.
+
+    - filter_query : Optional[Dict[str, Any]], optional (default=None)  
+        - A dictionary of filtering conditions to apply during the search.
+
+    ## Returns
+    - List  
+        A list of the most similar document chunks retrieved from the vector store.
+    """
+    
+    results = vector_store.similarity_search(
+        query=query,
+        k=k_most_similar,
+        filter=filter_query,
+    )
+
+    return results
