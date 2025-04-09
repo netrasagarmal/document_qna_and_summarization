@@ -5,8 +5,6 @@ from typing import List, Tuple, Dict, Union, Optional, Any
 from langchain.text_splitter import RecursiveCharacterTextSplitter  # To split text into chunks
 from langchain.schema import Document
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
-import requests
-# from transformers import AutoTokenizer
 import faiss
 from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_community.vectorstores import FAISS
@@ -112,7 +110,7 @@ def document_chunking(document: List[Document], chunk_size: int = 800, chunk_ove
 
     return chunks
 
-def initialize_embeddings(model_name: str = "BAAI/bge-large-en-v1.5", 
+def initialize_embeddings(model_name: str = "BAAI/bge-small-en-v1.5", 
                           model_kwargs: Dict[str, str] = {"device": "cpu"}, 
                           encode_kwargs: Dict[str, bool] = {"normalize_embeddings": True})->HuggingFaceBgeEmbeddings:
     """
@@ -133,11 +131,11 @@ def initialize_embeddings(model_name: str = "BAAI/bge-large-en-v1.5",
     - HuggingFaceBgeEmbeddings  
         An instance of HuggingFaceBgeEmbeddings initialized with given parameters.
     """
-    print("response generated")
+    
     hf = HuggingFaceBgeEmbeddings(
         model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
         )
-    print("response generated")
+    
     return hf
 
 def embed_query(embedding_model:HuggingFaceBgeEmbeddings, query:str)->List[float]:
