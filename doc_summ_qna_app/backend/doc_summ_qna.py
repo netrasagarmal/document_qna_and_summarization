@@ -93,9 +93,9 @@ class DocSummAndQnA:
             ("user",prompt)
         ]
 
-        model_name = "qwen-2.5"
-        api_base = "http://10.159.108.25:3010"
-        api_key = "sk-aDYdRPi_eZGnYm7olBMLaw"
+        model_name = ""
+        api_base = ""
+        api_key = ""
 
         # openAI LLM
         llm = ChatOpenAI(
