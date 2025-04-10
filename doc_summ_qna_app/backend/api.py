@@ -118,7 +118,91 @@ For instance, it significantly outperforms previous LayoutLMv2 and TILT models i
 ---
 
 Would you like a visual diagram of the architecture or a breakdown of how it compares to LayoutLMv2 or DocFormer?"""
+qna_dict = {
+    "layoutlm architecture":"""### 🔍 Architecture Overview
 
+                                **Inputs:**
+                                - Text tokens (from OCR)
+                                - Bounding box coordinates (layout info)
+                                - Image patches (from resized document image)
+
+                                **Embedding Layer:**
+                                - Text embeddings + layout embeddings
+                                - Image patch embeddings
+
+                                **Transformer Encoder:**
+                                - Processes all modalities together
+                                - Uses cross-modality attention to learn interactions
+
+                                **Pre-training Objectives:**
+                                - **Masked Language Modeling (MLM)** for text
+                                - **Masked Image Modeling (MIM)** for visual patches
+                                """,
+    "layoutlm sample code":"""Here’s a **sample code** to use **LayoutLMv3** from the Hugging Face Transformers library for **Document Question Answering (DocVQA)** or other tasks like key-value extraction.
+
+                                ---
+
+                                ### 🔧 **Installation**
+                                First, install the required libraries:
+
+                                ```bash
+                                pip install transformers torchvision pytesseract
+                                ```
+
+                                You’ll also need **Tesseract OCR** installed on your system. On Ubuntu:
+
+                                ```bash
+                                sudo apt install tesseract-ocr
+                                ```
+
+                                ---
+
+                                ### 📄 **Sample Code: LayoutLMv3 for Document QA**
+
+                                ```python
+                                from transformers import LayoutLMv3Processor, LayoutLMv3ForQuestionAnswering
+                                from PIL import Image
+                                import torch
+
+                                # Load model and processor
+                                model = LayoutLMv3ForQuestionAnswering.from_pretrained("microsoft/layoutlmv3-base")
+                                processor = LayoutLMv3Processor.from_pretrained("microsoft/layoutlmv3-base")
+
+                                # Load your document image
+                                image = Image.open("example_document.png").convert("RGB")
+
+                                # Your question about the document
+                                question = "What is the invoice number?"
+
+                                # Preprocess inputs (uses Tesseract OCR under the hood)
+                                inputs = processor(image, question, return_tensors="pt")
+
+                                # Inference
+                                outputs = model(**inputs)
+                                start_logits = outputs.start_logits
+                                end_logits = outputs.end_logits
+
+                                # Decode answer
+                                start_index = torch.argmax(start_logits)
+                                end_index = torch.argmax(end_logits)
+                                answer = processor.tokenizer.decode(inputs["input_ids"][0][start_index:end_index+1])
+
+                                print("Answer:", answer)
+                                ```
+
+                                ---
+
+                                ### 📌 Notes
+                                - Replace `"example_document.png"` with the path to your document.
+                                - The model uses OCR (Tesseract) under the hood to extract text and layout info.
+                                - You can adapt this for key-value extraction, classification, or VQA.
+
+                                ---
+
+                                Want a code sample for **key-value pair extraction** or **fine-tuning** as well?
+                                """,
+    
+}
 
 @app.post("/qna")
 def qna(json_payload:dict):
@@ -127,27 +211,16 @@ def qna(json_payload:dict):
     
         session_id = json_payload.get("session_id")
         question = json_payload.get("question")
+        answer = ""
         if not session_id:
             return JSONResponse(status_code=400, content={"error": "No session id provided"})
         else:
-            summary = """Here's a **Summary** of the **LayoutLMv3** research paper:
+            if question in qna_dict:
+                answer = qna_dict[question]
+            else:
+                answer = """ Sorry but I dont have the answer"""
 
-                ---
-
-                ### **LayoutLMv3 Summary**
-
-                **LayoutLMv3** is a multi-modal transformer model designed for **Document AI** tasks. It processes **text, layout (bounding boxes), and image data** together using a unified architecture. The model introduces **joint masked modeling**—masking both **text tokens** and **image patches** during pre-training—to better align visual and textual representations.
-
-                **Key features:**
-                - Uses a **single transformer** for all modalities.
-                - Improves **text-image alignment** with unified attention.
-                - Employs **2D spatial embeddings** to capture document layout.
-                - Achieves **state-of-the-art** results on datasets like FUNSD, SROIE, CORD, and DocVQA.
-
-                **Applications**: invoice extraction, form understanding, document classification, document VQA.
-            """
-
-            return JSONResponse(status_code=200, content={"summary": summary})
+            return JSONResponse(status_code=200, content={"summary": answer})
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": "issue at backend during text upload upload"})
 
@@ -229,11 +302,13 @@ async def upload_file(file: UploadFile = File(...), json_data:str = Form(...)):
 
         print(f"file received, session id created, {session_id}, file path: {tmp_path}")
 
-        current_session[str(session_id)] = {
-            "obj":DocSummAndQnA(),
-            "file_path":tmp_path,
-            "file_type":""
-        }
+        # if session_id in current_session:
+        current_session[str(session_id)]["obj"] = DocSummAndQnA()
+        current_session[str(session_id)]["file_path"] = tmp_path
+        current_session[str(session_id)]["file_type"] = ""
+        # else:
+        #     return JSONResponse(status_code=400, content={"error": "session id not "})
+
 
         return JSONResponse(status_code=200, content={"message": "file received at backend"})
     except Exception as e:
@@ -241,11 +316,12 @@ async def upload_file(file: UploadFile = File(...), json_data:str = Form(...)):
 
 
 
-@app.post("/create_session")
-def create_session(file: UploadFile = File(...)):
+@app.get("/create_session")
+def create_session():
 
     try:
         session_id = uuid.uuid4().hex
+        current_session[str(session_id)] = {}
 
         return JSONResponse(status_code=200, content={"session_id": session_id})
     except Exception as e:
