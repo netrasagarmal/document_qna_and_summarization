@@ -52,9 +52,14 @@ def qna(json_payload:dict):
             return JSONResponse(status_code=400, content={"error": "No session id provided"})
         else:
             if question in qna_dict:
-                answer = qna_dict[question]
+                # answer = qna_dict[question]
+                # get curr session obj
+                doc_summ_qna_obj = current_session["obj"]
+
+
+                # 
             else:
-                answer = """ Sorry but I dont have the answer"""
+                # answer = """ Sorry but I dont have the answer"""
 
             return JSONResponse(status_code=200, content={"answer": answer})
     except Exception as e:
@@ -98,8 +103,12 @@ def upload_text(json_payload:dict):
         session_id = json_payload.get("session_id")
         input_text = json_payload.get("input_text")
         
-        current_session[str(session_id)]["obj"] = DocSummAndQnA()
-        current_session[str(session_id)]["input_text"] = input_text
+        # current_session[str(session_id)]["input_text"] = input_text
+        current_session[str(session_id)]["input_content"] = "text"
+
+        # else:
+        #     return JSONResponse(status_code=400, content={"error": "session id not "})
+        current_session[str(session_id)]["obj"].load_document(document_type = current_session[str(session_id)]["file_type"], text = input_text)
         
 
         return JSONResponse(status_code=200, content={"message": "File deleted"})
@@ -130,11 +139,19 @@ async def upload_file(file: UploadFile = File(...), json_data: str = Form(...)):
         print(f"file received, session id created, {session_id}, file path: {tmp_path}")
 
         # if session_id in current_session:
-        current_session[str(session_id)]["obj"] = DocSummAndQnA()
+        
         current_session[str(session_id)]["file_path"] = tmp_path
-        current_session[str(session_id)]["file_type"] = ""
+        current_session[str(session_id)]["input_content"] = "file"
+
+        if tmp_path.endswith(".pdf"):
+            current_session[str(session_id)]["file_type"] = "PDF"
+        elif tmp_path.endswith(".docs"):
+            current_session[str(session_id)]["file_type"] = "DOCS"
+        elif tmp_path.endswith(".txt"):
+            current_session[str(session_id)]["file_type"] = "TXT"
         # else:
         #     return JSONResponse(status_code=400, content={"error": "session id not "})
+        current_session[str(session_id)]["obj"].load_document(file_path = tmp_path, document_type = current_session[str(session_id)]["file_type"])
 
         return JSONResponse(status_code=200, content={"message": "file received at backend"})
     except Exception as e:
@@ -149,6 +166,7 @@ def create_session():
         session_id = uuid.uuid4().hex
         current_session[session_id] = defaultdict(dict)
         print(current_session)
+        current_session[str(session_id)]["obj"] = DocSummAndQnA()
 
         return JSONResponse(status_code = 200, content={"session_id": session_id})
     except Exception as e:
