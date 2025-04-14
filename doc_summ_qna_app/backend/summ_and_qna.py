@@ -118,7 +118,7 @@ class DocSummAndQnA:
         #get document
 
         # Load document
-        docs = self.load_document(file_path=file_path, document_type=document_type)
+        docs = self.load_document(file_path=file_path, document_type=document_type, text=text)
 
         print("\n\n\n - - - document loaded - - - - - -- - \n\n")
 
